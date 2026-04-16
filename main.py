@@ -2,36 +2,41 @@ import requests
 import psycopg2
 from dotenv import load_dotenv, find_dotenv
 import os
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+
+logger = logging.getLogger(__name__)
 
 load_dotenv(find_dotenv())
 
 path = "https://api.carbonintensity.org.uk/intensity"
 headers = {"Accept": "application/json"}
 
-
 def extract_one_week():
-    from_date = "2026-04-02T15:00Z"
-    to_date = "2026-04-09T15:00Z"
+    from_date = "2026-04-09T15:00Z"
+    to_date = "2026-04-16T15:00Z"
+
+    logger.info(f"Fetching data from {from_date} to {to_date}")
 
     r = requests.get(f"{path}/{from_date}/{to_date}", headers=headers)
 
     r.raise_for_status()
 
-    return r.json()["data"]
+    data = r.json()["data"]
+    logger.info(f"Fetched {len(data)} records")
+
+    return data
 
 
-def add_row_to_db(data):
+def add_row_to_db(data, conn):
     query = f"""INSERT INTO raw_carbon_intensity VALUES (
         %s, %s, %s, %s, %s, NOW()
-    )
+    ) ON CONFLICT (from_ts, to_ts) DO NOTHING;
     """
-    conn = psycopg2.connect(
-        host="localhost",
-        port=5432,
-        dbname="carbonintensity",
-        user="sm",
-        password=os.environ.get("POSTGRES_PASSWORD")
-    )
     try:
         with conn.cursor() as cur:
             cur.execute(query, (
@@ -43,16 +48,31 @@ def add_row_to_db(data):
             ))
 
             conn.commit()
+
+            if cur.rowcount == 0:
+                logger.info("Duplicate skipped")
+            else:
+                logger.info("Row inserted")
         
-        print("Row successfully inserted.")
     except (Exception, psycopg2.DatabaseError) as error:
-        print(f"Error: {error}")
+        logger.exception("Error inserting row")
         conn.rollback()
-    finally:
-        conn.close()
+
 
 
 if __name__ == "__main__":
-    data = extract_one_week()
-    for record in data:
-        add_row_to_db(record)
+    conn = psycopg2.connect(
+        host="localhost",
+        port=5432,
+        dbname="carbonintensity",
+        user="sm",
+        password=os.environ.get("POSTGRES_PASSWORD")
+    )
+
+    try:
+        data = extract_one_week()
+        
+        for record in data:
+            add_row_to_db(record, conn)
+    finally:
+        conn.close()
