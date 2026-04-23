@@ -3,6 +3,8 @@ import psycopg2
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
+from datetime import timedelta
+from utils.datetime import parse_timestamp, format_for_api
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,10 +18,9 @@ load_dotenv(find_dotenv())
 path = "https://api.carbonintensity.org.uk/intensity"
 headers = {"Accept": "application/json"}
 
-def extract_intensity_date_range():
-    from_date = os.environ.get("BACKFILL_START_DATE")
-    to_date = os.environ.get("BACKFILL_END_DATE")
 
+def extract_intensity_date_range(from_date, to_date):
+    
     logger.info(f"Fetching data from {from_date} to {to_date}")
 
     r = requests.get(f"{path}/{from_date}/{to_date}", headers=headers)
@@ -32,7 +33,7 @@ def extract_intensity_date_range():
     return data
 
 
-def add_row_to_db(data, conn):
+def add_rows_to_db(data, cur):
     query = f"""INSERT INTO raw_carbon_intensity VALUES (
         %s, %s, %s, %s, %s, NOW()
     ) ON CONFLICT (from_ts, to_ts) DO NOTHING;
@@ -47,16 +48,9 @@ def add_row_to_db(data, conn):
         )
         for record in data
     ]
-    try:
-        with conn.cursor() as cur:
-            cur.executemany(query, rows)
-            conn.commit()
-            logger.info(f"Inserted {cur.rowcount} rows, skipped duplicates.")
-        
-    except (Exception, psycopg2.DatabaseError) as error:
-        logger.exception("Error inserting row")
-        conn.rollback()
 
+    cur.executemany(query, rows)
+    logger.info(f"Staged {cur.rowcount} rows, skipped duplicates.")
 
 
 if __name__ == "__main__":
@@ -68,9 +62,33 @@ if __name__ == "__main__":
         password=os.environ.get("POSTGRES_PASSWORD")
     )
 
+    from_date_str = os.environ.get("BACKFILL_START_DATE")
+    to_date_str = os.environ.get("BACKFILL_END_DATE")
+
+    from_date = parse_timestamp(from_date_str)
+    to_date = parse_timestamp(to_date_str)
+
+    if from_date > to_date:
+        raise ValueError("BACKFILL_START_DATE must be before BACKFILL_END_DATE")
+
+    max_span = timedelta(days=14)
+
     try:
-        data = extract_intensity_date_range()
-        
-        add_row_to_db(data, conn)
+        with conn:
+            with conn.cursor() as cur:
+                current_start = from_date
+
+                while current_start < to_date:
+                    current_end = min(current_start + max_span, to_date)
+
+                    data = extract_intensity_date_range(
+                        format_for_api(current_start),
+                        format_for_api(current_end)
+                    )
+
+                    add_rows_to_db(data, cur)
+                    current_start = current_end
+
     finally:
+        logger.info("Rows successfully inserted.")
         conn.close()
