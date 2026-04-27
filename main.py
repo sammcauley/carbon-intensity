@@ -7,8 +7,7 @@ from datetime import timedelta
 from utils.datetime import parse_timestamp, format_for_api
 
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ headers = {"Accept": "application/json"}
 
 
 def extract_intensity_date_range(from_date, to_date):
-    
+
     logger.info(f"Fetching data from {from_date} to {to_date}")
 
     r = requests.get(f"{path}/{from_date}/{to_date}", headers=headers)
@@ -44,7 +43,7 @@ def add_rows_to_db(data, cur):
             record["to"],
             record["intensity"]["forecast"],
             record["intensity"]["actual"],
-            record["intensity"]["index"]
+            record["intensity"]["index"],
         )
         for record in data
     ]
@@ -59,7 +58,7 @@ if __name__ == "__main__":
         port=os.environ.get("POSTGRES_PORT", 5432),
         dbname=os.environ.get("POSTGRES_DB"),
         user=os.environ.get("POSTGRES_USER"),
-        password=os.environ.get("POSTGRES_PASSWORD")
+        password=os.environ.get("POSTGRES_PASSWORD"),
     )
 
     from_date_str = os.environ.get("BACKFILL_START_DATE")
@@ -82,8 +81,7 @@ if __name__ == "__main__":
                     current_end = min(current_start + max_span, to_date)
 
                     data = extract_intensity_date_range(
-                        format_for_api(current_start),
-                        format_for_api(current_end)
+                        format_for_api(current_start), format_for_api(current_end)
                     )
 
                     add_rows_to_db(data, cur)
