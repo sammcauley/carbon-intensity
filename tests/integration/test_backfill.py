@@ -2,7 +2,8 @@ import pytest
 import psycopg2
 from src.pipeline import run_backfill
 from datetime import datetime, timezone
-from  unittest.mock import patch
+from  unittest.mock import patch, call
+from src.utils.datetime import format_for_api
 
 @pytest.fixture
 def test_conn(db_config):
@@ -109,3 +110,26 @@ def test_run_backfill_rolls_back_on_failure(mock_extract, test_conn, db_config):
     conn2.close()
 
     assert count == 0
+
+
+@patch("src.pipeline.extract_intensity_date_range")
+@patch("src.pipeline.add_rows_to_db")
+def test_run_backfill_chunks_large_date_range(mock_add_rows, mock_extract, test_conn):
+    mock_extract.return_value = []
+
+    from_date = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    to_date = datetime(2026, 2, 1, tzinfo=timezone.utc)
+
+    run_backfill(test_conn, from_date, to_date)
+
+    expected_calls = [
+        call(format_for_api(datetime(2026, 1, 1, tzinfo=timezone.utc)),
+             format_for_api(datetime(2026, 1, 15, tzinfo=timezone.utc))),
+        call(format_for_api(datetime(2026, 1, 15, tzinfo=timezone.utc)),
+             format_for_api(datetime(2026, 1, 29, tzinfo=timezone.utc))),
+        call(format_for_api(datetime(2026, 1, 29, tzinfo=timezone.utc)),
+             format_for_api(datetime(2026, 2, 1, tzinfo=timezone.utc))),
+    ]
+
+    assert mock_extract.call_count == 3
+    mock_extract.assert_has_calls(expected_calls)
