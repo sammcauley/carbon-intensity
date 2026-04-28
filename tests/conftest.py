@@ -1,4 +1,8 @@
 import pytest
+import os
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv())
 
 @pytest.fixture
 def sample_api_data():
@@ -37,3 +41,14 @@ def sample_api_data_null_actual():
             }
         }
     ]
+
+
+@pytest.fixture
+def db_config():
+    return {
+        "host": os.environ.get("POSTGRES_HOST", "localhost"),
+        "port": os.environ.get("POSTGRES_PORT", 5432),
+        "dbname": "carbonintensity_test",
+        "user": os.environ.get("POSTGRES_USER"),
+        "password": os.environ.get("POSTGRES_PASSWORD")
+    }

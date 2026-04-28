@@ -72,4 +72,3 @@ def run_backfill(conn, from_date, to_date):
 
     finally:
         logger.info("Rows successfully inserted.")
-        conn.close()

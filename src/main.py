@@ -37,4 +37,7 @@ if __name__ == "__main__":
     )
 
     from_date, to_date = get_env_dates()
-    run_backfill(conn, from_date, to_date)
+    try:
+        run_backfill(conn, from_date, to_date)
+    finally:
+        conn.close()

@@ -10,3 +10,4 @@ CREATE TABLE raw_carbon_intensity (
     PRIMARY KEY (from_ts, to_ts)
 );
 
+CREATE DATABASE carbonintensity_test;
