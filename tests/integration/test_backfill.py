@@ -51,19 +51,11 @@ def test_run_backfill_inserts_rows(mock_extract, test_conn, db_config):
 
     run_backfill(test_conn,from_date,to_date)
 
-    # check mock was actually called
-    print(f"mock called: {mock_extract.called}")
-    print(f"mock call count: {mock_extract.call_count}")
-
     conn2 = psycopg2.connect(**db_config)
 
     with conn2.cursor() as cur:
-        cur.execute("SELECT * FROM raw_carbon_intensity;")
-        rows = cur.fetchall()
-        print(f"rows in table: {rows}")
-        count = len(rows)
-        #cur.execute("SELECT COUNT(*) FROM raw_carbon_intensity;")
-        #count = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM raw_carbon_intensity;")
+        count = cur.fetchone()[0]
     conn2.close()
 
     assert count == 1
