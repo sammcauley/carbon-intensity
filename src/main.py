@@ -2,8 +2,8 @@ import psycopg2
 from dotenv import load_dotenv, find_dotenv
 import os
 import logging
-from src.utils.datetime import parse_timestamp
-from src.pipeline import run_backfill
+from utils.datetime import parse_timestamp
+from pipeline import run_backfill
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"

@@ -1,7 +1,7 @@
 import requests
 import logging
 from datetime import timedelta
-from src.utils.datetime import parse_timestamp, format_for_api
+from utils.datetime import parse_timestamp, format_for_api
 
 
 logging.basicConfig(
@@ -35,9 +35,9 @@ def transform_intensity_data(data):
         (
             record["from"],
             record["to"],
-            record["intensity"]["forecast"],
-            record["intensity"]["actual"],
-            record["intensity"]["index"],
+            record.get("intensity", {}).get("forecast"),
+            record.get("intensity", {}).get("actual"),
+            record.get("intensity", {}).get("index"),
         )
         for record in data
     ]
