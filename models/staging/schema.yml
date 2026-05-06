@@ -1,0 +1,11 @@
+models:
+  - name: stg_carbon_intensity
+    columns:
+      - name: from_ts
+        tests:
+          - not_null
+          - unique
+      - name: intensity_index
+        tests:
+          - accepted_values:
+              values: ['very low', 'low', 'moderate', 'high', 'very high']
