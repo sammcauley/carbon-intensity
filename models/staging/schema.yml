@@ -1,11 +1,32 @@
+version: 2
+
 models:
   - name: stg_carbon_intensity
+    description: "Cleaned and filtered view of raw carbon intensity data from the National Grid ESO API. Excludes records where actual intensity is null, which occurs for recent settlement periods where the grid sensor reading has not yet been recorded."
     columns:
       - name: from_ts
+        description: "Start timestamp of the half-hourly settlement period in UTC."
         tests:
           - not_null
           - unique
-      - name: intensity_index
+      - name: to_ts
+        description: "End timestamp of the half-hourly settlement period in UTC. Always 30 minutes after from_ts."
         tests:
+          - not_null
+      - name: forecast_intensity
+        description: "Forecast carbon intensity in gCO2eq/kWh predicted at the start of the settlement period. Occasionally null where the forecasting system did not produce a value."
+      - name: actual_intensity
+        description: "Actual measured carbon intensity in gCO2eq/kWh for the settlement period. Null values are filtered out in this model."
+        tests:
+          - not_null
+      - name: intensity_index
+        description: "Qualitative carbon intensity index assigned by National Grid ESO."
+        tests:
+          - not_null
           - accepted_values:
-              values: ['very low', 'low', 'moderate', 'high', 'very high']
+              arguments:
+                values: ['very low', 'low', 'moderate', 'high', 'very high']
+      - name: ingestion_ts
+        description: "Timestamp when the record was loaded into the raw table by the ingestion pipeline."
+        tests:
+          - not_null

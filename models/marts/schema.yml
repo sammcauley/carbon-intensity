@@ -1,0 +1,117 @@
+version: 2
+
+models:
+  - name: mart_best_and_worst_hours
+    description: "Ranks each hour of the day by average carbon intensity, from cleanest to dirtiest. Built on top of mart_hourly_intensity."
+    columns:
+      - name: hour_of_day
+        description: "Hour of the day from 0 to 23."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for that hour across the full dataset."
+        tests:
+          - not_null
+      - name: cleanest_rank
+        description: "Rank of the hour by average intensity ascending. Rank 1 is the cleanest hour of the day."
+        tests:
+          - not_null
+      - name: dirtiest_rank
+        description: "Rank of the hour by average intensity descending. Rank 1 is the dirtiest hour of the day."
+        tests:
+          - not_null
+
+  - name: mart_daily_intensity_change
+    description: "Daily average carbon intensity with day-on-day change compared to the previous day. Useful for identifying sudden shifts in grid cleanliness."
+    columns:
+      - name: date
+        description: "The date of the settlement periods."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for the day."
+        tests:
+          - not_null
+      - name: yesterday_avg_intensity
+        description: "Average actual carbon intensity for the previous day. Null for the first day in the dataset."
+      - name: daily_change
+        description: "Difference in average actual carbon intensity between the current day and the previous day in gCO2eq/kWh. Negative values indicate the grid was cleaner than the day before. Null for the first day in the dataset."
+
+  - name: mart_daily_intensity
+    description: "Daily summary of carbon intensity aggregated from half-hourly settlement periods."
+    columns:
+      - name: date
+        description: "The date of the settlement periods."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for the day."
+      - name: avg_forecast_intensity
+        description: "Average forecast carbon intensity in gCO2eq/kWh for the day."
+      - name: max_actual_intensity
+        description: "Maximum actual carbon intensity recorded during any settlement period in the day."
+        tests:
+          - not_null
+      - name: min_actual_intensity
+        description: "Minimum actual carbon intensity recorded during any settlement period in the day."
+        tests:
+          - not_null
+      - name: settlement_periods
+        description: "Number of half-hourly settlement periods in the day. Expected to be 48 for a full day."
+        tests:
+          - not_null
+
+  - name: mart_hourly_intensity
+    description: "Average carbon intensity by hour of day across the full dataset. Useful for identifying optimal low-carbon windows such as EV charging."
+    columns:
+      - name: hour_of_day
+        description: "Hour of the day from 0 to 23."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for that hour across the full dataset."
+        tests:
+          - not_null
+      - name: records
+        description: "Number of settlement periods included in the average for that hour."
+        tests:
+          - not_null
+
+  - name: mart_rolling_7_day_intensity
+    description: "Daily average carbon intensity alongside a 7 day rolling average. Smooths out day-to-day variability to reveal underlying trends."
+    columns:
+      - name: date
+        description: "The date of the settlement periods."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for the day."
+        tests:
+          - not_null
+      - name: rolling_7_day_avg
+        description: "Rolling 7 day average of actual carbon intensity in gCO2eq/kWh, including the current day and the 6 preceding days."
+        tests:
+          - not_null
+
+  - name: mart_yearly_intensity_change
+    description: "Monthly average carbon intensity with year-on-year comparison. Useful for tracking decarbonisation progress over time."
+    columns:
+      - name: month
+        description: "The month truncated to the first day of the month."
+        tests:
+          - not_null
+          - unique
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for the month."
+        tests:
+          - not_null
+      - name: prev_year_avg_intensity
+        description: "Average actual carbon intensity for the same month in the previous year. Null for the first 12 months of the dataset."
+      - name: yearly_change
+        description: "Difference in average actual carbon intensity between the current month and the same month in the previous year in gCO2eq/kWh. Negative values indicate the grid was cleaner than the same month last year. Null for the first 12 months of the dataset."
+      

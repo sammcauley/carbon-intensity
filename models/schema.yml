@@ -1,8 +1,34 @@
-
 version: 2
 
 sources:
   - name: raw
     schema: public
+    description: "Raw data ingested from the National Grid ESO Carbon Intensity API. Data is loaded by the Python ingestion pipeline in half-hourly settlement period batches."
     tables:
       - name: raw_carbon_intensity
+        description: "Raw carbon intensity records for Great Britain at the national level. Each row represents one half-hourly settlement period."
+        columns:
+          - name: from_ts
+            description: "Start timestamp of the half-hourly settlement period in UTC."
+            tests:
+              - not_null
+              - unique
+          - name: to_ts
+            description: "End timestamp of the half-hourly settlement period in UTC."
+            tests:
+              - not_null
+          - name: forecast_intensity
+            description: "Forecast carbon intensity in gCO2eq/kWh. Occasionally null where the forecasting system did not produce a value."
+          - name: actual_intensity
+            description: "Actual measured carbon intensity in gCO2eq/kWh. Null for recent settlement periods where the sensor reading has not yet been recorded."
+          - name: intensity_index
+            description: "Qualitative carbon intensity index assigned by National Grid ESO."
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['very low', 'low', 'moderate', 'high', 'very high']
+          - name: ingestion_ts
+            description: "Timestamp when the record was loaded into the raw table by the ingestion pipeline."
+            tests:
+              - not_null

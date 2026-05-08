@@ -1,7 +1,7 @@
 with daily_avg as (
     select
-        date_trunc('day', from_ts),
-        round(avg(actual_intensity)) as avg_actual_intensity,
+        date_trunc('day', from_ts) as date,
+        round(avg(actual_intensity)) as avg_actual_intensity
     from {{ ref('stg_carbon_intensity') }}
     group by 1
 )
