@@ -1,74 +1,138 @@
 # NESO Carbon Intensity Pipeline
 
 ## Overview
-This project injests data from the NESO Carbon Intensity API, cleans and transforms and models the data with dbt, before loading in Postgres.
+This project ingests data from the NESO Carbon Intensity API, cleans and transforms the data with dbt, and loads it into PostgreSQL for analysis.
 
-Carbon intensity (gCO2eq/kWh) is a measure of how many grams of carbon dioxide are released to produce a kilowatt hour of electricity. It essentially means how clean our electricity is. Electricity generated using fossil fuels emits more CO2, whereas renewable energy sources such as wind, hydro and solar power produce next to no CO2 emissions. Carbon intensity is not constant, the grid is a mix of generation sources which changes constantly based on demand and weather. Knowing when low-carbon elecricity is more available allows us to make more informed choices about when to use more electricity in our buildings. This therefore reduces our carbon footprint, and can reduce energy bills as renewable energy sources are cheaper.
+Carbon intensity (gCO2eq/kWh) is a measure of how many grams of carbon dioxide are released to produce a kilowatt hour of electricity — essentially how clean our electricity is. Electricity generated using fossil fuels emits more CO2, whereas renewable energy sources such as wind, hydro and solar produce next to no CO2 emissions.
 
-Demand for electricity generally peaks in the morning and evening, and "dirtier" peaking plants are brought online. This pushes the intensity up. Time of year also matters, as in winter solar generation is lower but demand is higher.
+Carbon intensity is not constant — the grid is a mix of generation sources which changes constantly based on demand and weather. Knowing when low-carbon electricity is more available allows us to make more informed choices about when to use electricity, reducing our carbon footprint and potentially our energy bills.
 
+Demand for electricity generally peaks in the morning and evening when dirtier peaking plants are brought online, pushing intensity up. Time of year also matters — in winter solar generation is lower but demand is higher, generally meaning higher intensity than summer.
 
 ## Architecture
-NESO Carbon Intensity API -> Ingestion: Python -> Transformation: dbt -> Storage: PostgreSQL
+NESO Carbon Intensity API → Python ingestion → PostgreSQL (raw) → dbt → PostgreSQL (staging + marts)
 
 ## Data source
-https://api.carbonintensity.org.uk/
-The API used is the NESO Carbon Intensity API, which is free to use and unrestricted. The following endpoints are used:
-- /intensity/{from}/{to}
-- /region
+- API: https://api.carbonintensity.org.uk/
+- Free to use, no authentication required
+- Endpoint used: `/intensity/{from}/{to}`
 
-The intensity endpoint returns an index with the values "very low", "low", "moderate", "high", and "very high".
-This endpoint also returns a forecast intensity, a prediction made at the start of the settlement period, and an actual intensity, which is measured after the settlement period. The actual intensity will sometimes be returned as null because the measurement hasn't come in yet.
+Each record represents one half-hourly settlement period — the unit the UK electricity market settles in. Each period returns:
+- `forecast_intensity` — a prediction made at the start of the settlement period
+- `actual_intensity` — measured after the period ends, occasionally null for recent periods where the reading has not yet come in
+- `intensity_index` — a qualitative label: very low, low, moderate, high, or very high
+
+### Data quality
+During backfill, 43 records (~0.1% of the dataset) were found to have a null `forecast_intensity`. These cluster on specific dates suggesting a forecasting system outage rather than random noise. These records are retained in the raw table and handled in the staging layer. Records with null `actual_intensity` are filtered out in staging as they represent incomplete settlement periods.
 
 ## Tech stack
-- Python
-- Polars
-- requests
-- dbt
-- Airflow
-- PostgreSQL
+- Python — data ingestion and backfill
+- requests — API calls
+- psycopg2 — database connection
+- dbt — data transformation and modelling
+- PostgreSQL — data storage
+- Docker — containerised Postgres instance
+- pytest — unit and integration testing
 
 ## Project structure
-/ requirements.txt \
-/ tests \
-/ main.py 
+carbon-intensity/
+├── src/
+│   ├── pipeline.py        # ingestion and loading logic
+│   ├── main.py            # entrypoint for backfill
+│   └── utils/
+│       └── datetime.py    # timestamp parsing and formatting
+├── models/
+│   ├── sources.yml        # raw source definition
+│   ├── staging/
+│   │   ├── stg_carbon_intensity.sql
+│   │   └── schema.yml
+│   └── marts/
+│       ├── mart_daily_intensity.sql
+│       ├── mart_daily_intensity_change.sql
+│       ├── mart_hourly_intensity.sql
+│       ├── mart_best_and_worst_hours.sql
+│       ├── mart_rolling_7_day_intensity.sql
+│       ├── mart_yearly_intensity_change.sql
+│       └── schema.yml
+├── tests/
+│   ├── unit/
+│   └── integration/
+├── dbt_project.yml
+├── docker-compose.yml
+└── requirements.txt
+
+## dbt models
+
+### Staging
+`stg_carbon_intensity` — cleans and filters the raw data. Filters out records where actual intensity is null, leaving a clean dataset of complete settlement periods for downstream models to build on.
+
+### Marts
+| Model | Description |
+|---|---|
+| `mart_daily_intensity` | Daily average, min, max and forecast intensity aggregated from half-hourly settlement periods |
+| `mart_daily_intensity_change` | Daily average intensity with day-on-day change using LAG() window function |
+| `mart_hourly_intensity` | Average intensity by hour of day across the full dataset |
+| `mart_best_and_worst_hours` | Hours of the day ranked from cleanest to dirtiest using RANK() |
+| `mart_rolling_7_day_intensity` | Daily intensity with 7 day rolling average to smooth day-to-day variability |
+| `mart_yearly_intensity_change` | Monthly intensity with year-on-year comparison using LAG() offset by 12 months |
+
+## How to run
+
+### Prerequisites
+- Docker
+- Python 3.11+
+- dbt-postgres
+
+### Spin up the database
+```bash
+docker compose up -d
+```
+
+### Install dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### Run the backfill
+Set the following environment variables in a `.env` file:
+BACKFILL_START_DATE=2024-01-01T00:00Z
+BACKFILL_END_DATE=2026-04-01T00:00Z
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=carbonintensity
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+
+```bash
+PYTHONPATH=. python src/main.py
+```
+
+### Run dbt
+```bash
+dbt build
+```
+
+### Run tests
+```bash
+pytest tests/
+```
 
 ## Findings
-This query was run on the two year period of 29/04/24 - 29/04/26:
-SELECT 
-    EXTRACT(HOUR FROM from_ts) AS hour_of_day,
-    ROUND(AVG(actual_intensity)) AS avg_intensity,
-    COUNT(*) AS records
-FROM raw_carbon_intensity
-GROUP BY hour_of_day
-ORDER BY hour_of_day;
 
-and produced this output:
- hour_of_day | avg_intensity | records 
--------------+---------------+---------
-           0 |           110 |    1458
-           1 |           108 |    1458
-           2 |           107 |    1458
-           3 |           109 |    1458
-           4 |           116 |    1458
-           5 |           128 |    1458
-           6 |           136 |    1458
-           7 |           134 |    1458
-           8 |           128 |    1458
-           9 |           120 |    1458
-          10 |           114 |    1458
-          11 |           111 |    1458
-          12 |           110 |    1458
-          13 |           113 |    1458
-          14 |           121 |    1459
-          15 |           135 |    1460
-          16 |           148 |    1460
-          17 |           156 |    1460
-          18 |           158 |    1460
-          19 |           155 |    1460
-          20 |           147 |    1460
-          21 |           131 |    1460
-          22 |           116 |    1460
-          23 |           110 |    1459
+### Carbon intensity by hour of day
+Analysis of two years of data (April 2024 — April 2026) shows a clear daily intensity curve:
 
-The morning peaks in intensity at around 6am - kettles, showers and lighting are being used at this time. The peak is relatively soft and drops back down at around 9am as demand stabilises. The afternoon/evening peak is more dominant, beginning at 2-3pm until 6pm, and shows people returning home from work, cooking, turning heating on etc. This is when gas peakers are most likely to be running. Overnight shows the cleanest energy as there is less demand and wind and nuclear are doing most of the work.
+| Period | Hours | Avg Intensity | Explanation |
+|---|---|---|---|
+| Overnight trough | 00:00 — 04:00 | ~107-109 | Low demand, wind and nuclear doing most of the work |
+| Morning peak | 05:00 — 07:00 | ~128-136 | Kettles, showers, lighting — demand surges quickly |
+| Midday dip | 09:00 — 13:00 | ~111-120 | Demand stabilises, solar contributing in summer |
+| Evening peak | 16:00 — 19:00 | ~148-158 | People returning home, cooking, heating — gas peakers firing |
+
+The evening peak at 18:00 (158 gCO2eq/kWh) is roughly 50% higher carbon intensity than the overnight trough at 02:00 (107 gCO2eq/kWh). This means **the carbon footprint of electricity consumption varies significantly by time of day**.
+
+### Practical implication — EV charging
+Charging an electric vehicle overnight (00:00 — 04:00) rather than during the evening peak (17:00 — 19:00) reduces the carbon intensity of that charge by approximately 50 gCO2eq/kWh. For a 60kWh battery this represents a saving of around 3kg of CO2 per full charge — purely from timing the same activity differently.
+
+### Year-on-year decarbonisation
+The `mart_yearly_intensity_change` model allows comparison of the same month across years. A consistent negative `yearly_change` value across months would indicate the UK grid is getting progressively cleaner — directly visible in the data as offshore wind capacity has grown.
