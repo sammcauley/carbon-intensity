@@ -62,6 +62,7 @@ carbon-intensity/
 ├── dbt_project.yml
 ├── docker-compose.yml
 └── requirements.txt
+````
 
 ## dbt models
 
