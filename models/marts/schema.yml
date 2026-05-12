@@ -64,6 +64,26 @@ models:
         tests:
           - not_null
 
+  - name: mart_hourly_intensity_by_day_of_week
+    description: "Average carbon intensity by hour of day by day of week across the full dataset. Useful for identifying optimal low-carbon windows such as EV charging."
+    columns:
+      - name: day_of_week 
+        description: "Day of week from 0 to 6, with 0 being Sunday."
+        tests:
+          - not null
+      - name: hour_of_day
+        description: "Hour of the day from 0 to 23."
+        tests:
+          - not_null
+      - name: avg_actual_intensity
+        description: "Average actual carbon intensity in gCO2eq/kWh for that day and hour across the full dataset."
+        tests:
+          - not_null
+      - name: records
+        description: "Number of settlement periods included in the average for that day and hour."
+        tests:
+          - not_null
+
   - name: mart_hourly_intensity
     description: "Average carbon intensity by hour of day across the full dataset. Useful for identifying optimal low-carbon windows such as EV charging."
     columns:

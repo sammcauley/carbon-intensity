@@ -35,6 +35,7 @@ During backfill, 43 records (~0.1% of the dataset) were found to have a null `fo
 - pytest — unit and integration testing
 
 ## Project structure
+````bash
 carbon-intensity/
 ├── src/
 │   ├── pipeline.py        # ingestion and loading logic
@@ -49,6 +50,7 @@ carbon-intensity/
 │   └── marts/
 │       ├── mart_daily_intensity.sql
 │       ├── mart_daily_intensity_change.sql
+│       ├── mart_hourly_intensity_by_day_of_week.sql
 │       ├── mart_hourly_intensity.sql
 │       ├── mart_best_and_worst_hours.sql
 │       ├── mart_rolling_7_day_intensity.sql
@@ -60,6 +62,7 @@ carbon-intensity/
 ├── dbt_project.yml
 ├── docker-compose.yml
 └── requirements.txt
+````
 
 ## dbt models
 
@@ -71,6 +74,7 @@ carbon-intensity/
 |---|---|
 | `mart_daily_intensity` | Daily average, min, max and forecast intensity aggregated from half-hourly settlement periods |
 | `mart_daily_intensity_change` | Daily average intensity with day-on-day change using LAG() window function |
+| `mart_hourly_intensity_by_day_of_week` | Average intensity by day of week and hour across the full dataset |
 | `mart_hourly_intensity` | Average intensity by hour of day across the full dataset |
 | `mart_best_and_worst_hours` | Hours of the day ranked from cleanest to dirtiest using RANK() |
 | `mart_rolling_7_day_intensity` | Daily intensity with 7 day rolling average to smooth day-to-day variability |
