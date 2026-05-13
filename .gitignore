@@ -221,3 +221,9 @@ __marimo__/
 target/
 dbt_packages/
 logs/
+
+airflow.cfg
+airflow.db
+webserver_config.py
+logs/
+plugins/
